@@ -60,9 +60,10 @@ module Graphics.Rendering.Pango.Rendering (
 #endif
   ) where
 
+import Prelude hiding (pi)
 import System.Glib.FFI
 import System.Glib.UTFString
-import Graphics.Rendering.Pango.Structs  ( pangoItemRawAnalysis, intToPu,
+import Graphics.Rendering.Pango.Structs  ( pangoItemRawAnalysis,
   pangoItemRawGetOffset, pangoItemRawGetLength,
   pangoItemGetFont, pangoItemGetLanguage)
 {#import Graphics.Rendering.Pango.Types#}       (PangoContext(..), Font(..))
@@ -70,6 +71,7 @@ import Graphics.Rendering.Pango.Structs  ( pangoItemRawAnalysis, intToPu,
 {#import Graphics.Rendering.Pango.Enums#}
 {#import Graphics.Rendering.Pango.Attributes#}
 import Graphics.Rendering.Pango.GlyphStorage
+import Graphics.Rendering.Pango.Font (pangoGetFontMetrics)
 {#import System.Glib.GList#}
 
 {# context lib="pango" prefix="pango" #}
@@ -99,34 +101,7 @@ pangoItemGetFontMetrics pi = do
   font <- pangoItemGetFont pi
   lang <- pangoItemGetLanguage pi
   mPtr <- {#call unsafe font_get_metrics#} font lang
-  ascent <- {#call unsafe font_metrics_get_ascent#} mPtr
-  descent <- {#call unsafe font_metrics_get_descent#} mPtr
-  approximate_char_width <-
-      {#call unsafe font_metrics_get_approximate_char_width#} mPtr
-  approximate_digit_width <-
-      {#call unsafe font_metrics_get_approximate_digit_width#} mPtr
-#if PANGO_VERSION_CHECK(1,6,0)
-  underline_position <-
-      {#call unsafe font_metrics_get_underline_position#} mPtr
-  underline_thickness <-
-      {#call unsafe font_metrics_get_underline_thickness#} mPtr
-  strikethrough_position <-
-      {#call unsafe font_metrics_get_strikethrough_position#} mPtr
-  strikethrough_thickness <-
-      {#call unsafe font_metrics_get_strikethrough_thickness#} mPtr
-#endif
-  return (FontMetrics
-          (intToPu ascent)
-          (intToPu descent)
-          (intToPu approximate_char_width)
-          (intToPu approximate_digit_width)
-#if PANGO_VERSION_CHECK(1,6,0)
-          (intToPu underline_position)
-          (intToPu underline_thickness)
-          (intToPu strikethrough_position)
-          (intToPu strikethrough_thickness)
-#endif
-         )
+  pangoGetFontMetrics mPtr
 
 -- | Turn a 'PangoItem' into a 'GlyphItem'.
 --

@@ -74,6 +74,10 @@ module Graphics.Rendering.Pango.Layout (
   layoutSetAutoDir,
   layoutGetAutoDir,
 #endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  layoutSetLineSpacing,
+  layoutGetLineSpacing,
+#endif
   LayoutAlignment(..),
   layoutSetAlignment,
   layoutGetAlignment,
@@ -89,6 +93,9 @@ module Graphics.Rendering.Pango.Layout (
   layoutGetCursorPos,
   CursorPos(..),
   layoutMoveCursorVisually,
+#if PANGO_VERSION_CHECK(1,22,0)
+  layoutGetBaseline,
+#endif
   layoutGetExtents,
   layoutGetPixelExtents,
   layoutGetLineCount,
@@ -120,14 +127,14 @@ module Graphics.Rendering.Pango.Layout (
   layoutLineGetXRanges
   ) where
 
+import Prelude hiding (log)
 import Control.Monad    (liftM)
 import Data.Char     (ord, chr)
 import Data.Text (Text)
 
-import System.Glib.FFI
+import System.Glib.FFI hiding (alignPtr)
 import System.Glib.UTFString
 import System.Glib.GList                (readGSList)
-import System.Glib.GObject              (wrapNewGObject, makeNewGObject)
 import Graphics.Rendering.Pango.Structs
 {#import Graphics.Rendering.Pango.BasicTypes#}
 import Graphics.Rendering.Pango.Types
@@ -166,9 +173,9 @@ layoutText pc txt = do
 -- | Create a copy of the 'Layout'.
 --
 layoutCopy :: PangoLayout -> IO PangoLayout
-layoutCopy (PangoLayout uc pl) = do
+layoutCopy (PangoLayout uc pl') = do
   pl <- wrapNewGObject mkPangoLayoutRaw
-    ({#call unsafe layout_copy#} pl)
+    ({#call unsafe layout_copy#} pl')
   return (PangoLayout uc pl)
 
 -- | Retrieves the 'PangoContext' from this layout.
@@ -488,6 +495,17 @@ layoutGetAutoDir (PangoLayout _ pl) =
   liftM toBool $ {#call unsafe layout_get_auto_dir#} pl
 #endif
 
+#if PANGO_VERSION_CHECK(1,44,0)
+-- | Set the line spacing factor of the layout.
+layoutSetLineSpacing :: PangoLayout -> Double -> IO ()
+layoutSetLineSpacing (PangoLayout _ pl) lsp =
+  {#call unsafe layout_set_line_spacing#} pl (realToFrac lsp)
+
+-- | Get the line spacing factor of the layout.
+layoutGetLineSpacing :: PangoLayout -> IO Double
+layoutGetLineSpacing (PangoLayout _ pl) = liftM realToFrac $
+  {#call unsafe layout_get_line_spacing#} pl
+#endif
 
 -- | Enumerate to which side incomplete lines are flushed.
 --
@@ -513,7 +531,7 @@ layoutGetAlignment (PangoLayout _ pl) = liftM (toEnum.fromIntegral) $
 --
 -- * Only Tab stops that align text to the left are supported right now.
 --
-{#enum PangoTabAlign as TabAlign {underscoreToCase}#}
+{#enum PangoTabAlign as TabAlign {underscoreToCase} deriving (Eq, Show)#}
 
 -- | A Tab position.
 --
@@ -718,6 +736,13 @@ layoutGetExtents :: PangoLayout
 layoutGetExtents (PangoLayout _ pl) =
   twoRect $ {#call unsafe layout_get_extents#} pl
 
+#if PANGO_VERSION_CHECK(1,22,0)
+-- | Gets the Y position of baseline of the first line in @layout.
+layoutGetBaseline :: PangoLayout -> IO Int
+layoutGetBaseline (PangoLayout _ pl) = liftM fromIntegral $
+  {#call unsafe layout_get_baseline#} pl
+#endif
+
 -- | Compute the physical size of the layout.
 --
 -- * Computes the ink and the logical size of the 'Layout' in device units,
@@ -762,7 +787,7 @@ layoutGetLine (PangoLayout psRef pl) idx = do
       ("Graphics.Rendering.Pango.Layout.layoutGetLine: "++
        "no line at index "++show idx)) else do
   ll <- makeNewLayoutLineRaw llPtr
-  {#call unsafe layout_line_ref#} ll
+  _ <- {#call unsafe layout_line_ref#} ll
   return (LayoutLine psRef ll)
 
 -- | Extract the lines of the layout.
@@ -867,11 +892,11 @@ layoutIterGetItem :: LayoutIter -> IO (Maybe GlyphItem)
 layoutIterGetItem (LayoutIter psRef li) = do
   giPtr <- {#call unsafe layout_iter_get_run#} li
   if giPtr==nullPtr then return Nothing else liftM Just $ do
-    (PangoString uc _ _) <- readIORef psRef
+    (PangoString _uc _ _) <- readIORef psRef
     pirPtr <- {#get PangoGlyphItem.item#} giPtr
     gsrPtr <- {#get PangoGlyphItem.glyphs#} giPtr
-    let dummy = {#call unsafe pango_item_copy#}
-    let dummy = {#call unsafe pango_glyph_string_copy#}
+    let _dummy = {#call unsafe pango_item_copy#}
+    let _dummy = {#call unsafe pango_glyph_string_copy#}
     pirPtr' <- pango_item_copy pirPtr
     gsrPtr' <- pango_glyph_string_copy gsrPtr
     pir <- makeNewPangoItemRaw pirPtr'
@@ -887,7 +912,7 @@ layoutIterGetLine (LayoutIter psRef li) = do
   llPtr <- liftM castPtr $ {#call unsafe pango_layout_iter_get_line#} li
   if (llPtr==nullPtr) then return Nothing else do
     ll <- makeNewLayoutLineRaw llPtr
-    {#call unsafe layout_line_ref#} ll
+    _ <- {#call unsafe layout_line_ref#} ll
     return (Just (LayoutLine psRef ll))
 
 -- | Retrieve a rectangle surrounding a character.
@@ -1064,5 +1089,6 @@ layoutLineGetXRanges (LayoutLine psRef ll) start end = do
     {#call unsafe g_free#} (castPtr arr)
     let toRange (s:e:rs) = (intToPu s, intToPu e):toRange rs
         toRange [] = []
+        toRange _ = error "layoutLineGetXRanges: unexpected data"
     return (toRange elems)
 

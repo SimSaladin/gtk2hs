@@ -76,12 +76,10 @@ import Control.Monad    (liftM)
 
 import System.Glib.FFI
 import Graphics.Rendering.Pango.Enums
-import Graphics.Rendering.Pango.Structs
-import System.Glib.GObject  (makeNewGObject)
 {#import Graphics.Rendering.Pango.Types#}
 {#import Graphics.Rendering.Pango.BasicTypes#}
-{#import Graphics.Rendering.Pango.Enums#} ( FontMetrics(..) )
 {#import Graphics.Rendering.Cairo.Matrix#}
+import Graphics.Rendering.Pango.Font (pangoGetFontMetrics)
 
 
 {# context lib="pango" prefix="pango" #}
@@ -109,34 +107,7 @@ contextGetMetrics :: PangoContext -> FontDescription -> Language ->
                      IO FontMetrics
 contextGetMetrics pc fd l = do
   mPtr <- {#call unsafe context_get_metrics#} pc fd l
-  ascent <- {#call unsafe font_metrics_get_ascent#} mPtr
-  descent <- {#call unsafe font_metrics_get_descent#} mPtr
-  approximate_char_width <-
-      {#call unsafe font_metrics_get_approximate_char_width#} mPtr
-  approximate_digit_width <-
-      {#call unsafe font_metrics_get_approximate_digit_width#} mPtr
-#if PANGO_VERSION_CHECK(1,6,0)
-  underline_position <-
-      {#call unsafe font_metrics_get_underline_position#} mPtr
-  underline_thickness <-
-      {#call unsafe font_metrics_get_underline_thickness#} mPtr
-  strikethrough_position <-
-      {#call unsafe font_metrics_get_strikethrough_position#} mPtr
-  strikethrough_thickness <-
-      {#call unsafe font_metrics_get_strikethrough_thickness#} mPtr
-#endif
-  return (FontMetrics
-          (intToPu ascent)
-          (intToPu descent)
-          (intToPu approximate_char_width)
-          (intToPu approximate_digit_width)
-#if PANGO_VERSION_CHECK(1,6,0)
-          (intToPu underline_thickness)
-          (intToPu underline_position)
-          (intToPu strikethrough_thickness)
-          (intToPu strikethrough_position)
-#endif
-         )
+  pangoGetFontMetrics mPtr
 
 -- | Set the default 'FontDescription' of this context.
 --

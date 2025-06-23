@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 -- -*-haskell-*-
 --  GIMP Toolkit (GTK) - text layout functions: Font
 --
@@ -57,33 +58,73 @@ module Graphics.Rendering.Pango.Font (
   FontMap,
   FontMapClass,
   pangoFontMapListFamilies,
+  pangoFontMapLoadFont,
+#if PANGO_VERSION_CHECK(1,22,0)
+  pangoFontMapCreateContext,
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  pangoFontMapGetFamily,
+#endif
+  -- PangoFontFamily methods
   FontFamily,
   FontFamilyClass,
 #if PANGO_VERSION_CHECK(1,4,0)
   pangoFontFamilyIsMonospace,
 #endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  pangoFontFamilyIsVariable,
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  pangoFontFamilyGetFace,
+#endif
   pangoFontFamilyListFaces,
+  -- PangoFontFace methods
   FontFace,
   FontFaceClass,
 #if PANGO_VERSION_CHECK(1,4,0)
   pangoFontFaceListSizes,
 #endif
   pangoFontFaceDescribe,
+#if PANGO_VERSION_CHECK(1,46,0)
+  pangoFontFaceGetFamily,
+#endif
+  -- PangoFont methods
   Font,
   FontClass,
+  pangoFontDescribe,
+#if PANGO_VERSION_CHECK(1,10,0)
+  pangoFontGetFontMap,
+#endif
+#if PANGO_VERSION_CHECK(1,14,0)
+  pangoFontDescribeAbsolute,
+#endif
+  pangoFontGetMetrics,
+#if PANGO_VERSION_CHECK(1,44,0)
+  pangoFontGetHBFont,
+  pangoFontGetFeatures,
+  pangoFontHasChar,
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  pangoFontGetFace,
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+  pangoFontGetLanguages,
+#endif
+  pangoGetFontMetrics,
   ) where
 
 import Control.Monad    (liftM)
 import qualified Data.Text as T (unpack)
+import Data.Char (ord)
 
 import System.Glib.FFI
 import System.Glib.UTFString
-import System.Glib.GObject              (makeNewGObject)
 {#import Graphics.Rendering.Pango.BasicTypes#}
 {#import Graphics.Rendering.Pango.Types#}
-{#import Graphics.Rendering.Pango.Enums#} (FontMetrics)
+{#import Graphics.Rendering.Pango.Enums#} (FontMetrics(..))
 import Graphics.Rendering.Pango.Description
 import Graphics.Rendering.Pango.Structs
+import Graphics.Rendering.Pango.HB
 
 {# context lib="pango" prefix="pango" #}
 
@@ -123,6 +164,34 @@ instance Show FontFamily where
 pangoFontFamilyIsMonospace :: FontFamily -> Bool
 pangoFontFamilyIsMonospace ff = unsafePerformIO $
   liftM toBool $ {#call unsafe font_family_is_monospace#} ff
+#endif
+
+#if PANGO_VERSION_CHECK(1,44,0)
+-- | Ask if the given family has variations.
+--
+-- * A variable font is a font which has axes that can be modified to produce
+--   different faces.
+--
+-- Since: 1.44
+pangoFontFamilyIsVariable :: FontFamily -> Bool
+pangoFontFamilyIsVariable ff = unsafePerformIO $
+  liftM toBool $ {#call unsafe font_family_is_variable#} ff
+#endif
+
+#if PANGO_VERSION_CHECK(1,46,0)
+-- | Get font face by name in font family. Nothing will return the default
+-- face e.g. "Regular" per fontconfig.
+--
+-- Since: 1.46
+pangoFontFamilyGetFace :: FontFamily -> Maybe String -> IO (Maybe FontFace)
+pangoFontFamilyGetFace ff mname = do
+  let withName = case mname of
+                     Nothing -> ($ nullPtr)
+                     Just name -> withUTFString name
+  ffPtr <- withName $ {#call unsafe font_family_get_face#} ff
+  if ffPtr == nullPtr
+    then return Nothing
+    else liftM Just . makeNewGObject mkFontFace . return $ castPtr ffPtr
 #endif
 
 -- | Ask for the faces contained in a particular family.
@@ -175,3 +244,172 @@ pangoFontFaceDescribe :: FontFace -> IO FontDescription
 pangoFontFaceDescribe ff = do
   fdPtr <- {#call unsafe font_face_describe#} ff
   makeNewFontDescription fdPtr
+
+#if PANGO_VERSION_CHECK(1,46,0)
+-- | Get the font family of font face.
+--
+-- Since: 1.46
+pangoFontFaceGetFamily :: FontFace -> IO FontFamily
+pangoFontFaceGetFamily ff = do
+  fnmPtr <- {#call unsafe font_face_get_family#} ff
+  makeNewGObject mkFontFamily . return $ castPtr fnmPtr
+#endif
+
+#if PANGO_VERSION_CHECK(1,22,0)
+-- | Create a Pango context for font map.
+--
+-- Since: 1.22
+pangoFontMapCreateContext :: FontMap -> IO PangoContext
+pangoFontMapCreateContext fm = wrapNewGObject mkPangoContext $
+  {#call unsafe font_map_create_context#} fm
+#endif
+
+#if PANGO_VERSION_CHECK(1,46,0)
+-- | Get a font family by its name.
+--
+-- Since: 1.46
+pangoFontMapGetFamily :: FontMap -> String -> IO FontFamily
+pangoFontMapGetFamily fm name = withUTFString name $ \strPtr -> do
+  fnmPtr <- {#call unsafe font_map_get_family#} fm strPtr
+  makeNewGObject mkFontFamily . return $ castPtr fnmPtr
+#endif
+
+-- | Load a font.
+--
+-- Since: (n/a)
+pangoFontMapLoadFont :: FontMap -> PangoContext -> FontDescription -> IO Font
+pangoFontMapLoadFont fm ctx descr = do
+  fPtr <- {#call unsafe font_map_load_font#} fm ctx descr
+  makeNewGObject mkFont . return $ castPtr fPtr
+
+-- | Describe font.
+--
+-- Since: (n/a)
+pangoFontDescribe :: Font -> IO FontDescription
+pangoFontDescribe fn = do
+  fdPtr <- {#call unsafe font_describe#} fn
+  makeNewFontDescription fdPtr
+
+#if PANGO_VERSION_CHECK(1,14,0)
+-- | Describe font using absolute (device) units.
+--
+-- Since: 1.14
+pangoFontDescribeAbsolute :: Font -> IO FontDescription
+pangoFontDescribeAbsolute fn = do
+  fdPtr <- {#call unsafe font_describe_with_absolute_size#} fn
+  makeNewFontDescription fdPtr
+#endif
+
+-- | Get font metrics.
+--
+-- Since: (n/a)
+pangoFontGetMetrics :: Font -> Language -> IO FontMetrics
+pangoFontGetMetrics fn lang = do
+  mPtr <- {#call unsafe font_get_metrics#} fn lang
+  pangoGetFontMetrics mPtr
+
+pangoGetFontMetrics :: Ptr () -> IO FontMetrics
+pangoGetFontMetrics mPtr = do
+  ascent' <- {#call unsafe font_metrics_get_ascent#} mPtr
+  descent' <- {#call unsafe font_metrics_get_descent#} mPtr
+#if PANGO_VERSION_CHECK(1,44,0)
+  height' <- {#call unsafe font_metrics_get_height#} mPtr
+#endif
+  approximate_char_width <-
+      {#call unsafe font_metrics_get_approximate_char_width#} mPtr
+  approximate_digit_width <-
+      {#call unsafe font_metrics_get_approximate_digit_width#} mPtr
+#if PANGO_VERSION_CHECK(1,6,0)
+  underline_position <-
+      {#call unsafe font_metrics_get_underline_position#} mPtr
+  underline_thickness <-
+      {#call unsafe font_metrics_get_underline_thickness#} mPtr
+  strikethrough_position <-
+      {#call unsafe font_metrics_get_strikethrough_position#} mPtr
+  strikethrough_thickness <-
+      {#call unsafe font_metrics_get_strikethrough_thickness#} mPtr
+#endif
+  return (FontMetrics
+          (intToPu ascent')
+          (intToPu descent')
+#if PANGO_VERSION_CHECK(1,44,0)
+          (intToPu height')
+#endif
+          (intToPu approximate_char_width)
+          (intToPu approximate_digit_width)
+#if PANGO_VERSION_CHECK(1,6,0)
+          (intToPu underline_thickness)
+          (intToPu underline_position)
+          (intToPu strikethrough_thickness)
+          (intToPu strikethrough_position)
+#endif
+         )
+
+#if PANGO_VERSION_CHECK(1,44,0)
+-- | Get Harfbuzz reference to the font.
+--
+-- Since: 1.44
+pangoFontGetHBFont :: Font -> IO HBFont
+pangoFontGetHBFont fn = do
+  hbfPtr <- {#call unsafe pango_font_get_hb_font#} fn
+  return $ HBFont $ castPtr hbfPtr
+
+-- | Get available font features. (This usually does not work.)
+--
+-- Since: 1.44
+pangoFontGetFeatures :: Font -> IO [FontFeature]
+pangoFontGetFeatures fn = allocaArray len $ \featArrPtr -> alloca $ \sizePtr -> do
+  poke sizePtr 0
+  featArr <- peek featArrPtr
+  {# call unsafe font_get_features#} fn featArr (fromIntegral len) sizePtr
+  size <- peek sizePtr
+  feats <- peekArray (fromIntegral size) (castPtr featArrPtr)
+  mapM fromHBFeature feats
+  where len = 64
+
+-- | Ask if the given font contains a glyph for the character.
+--
+-- Since: 1.44
+pangoFontHasChar :: Font -> Char -> IO Bool
+pangoFontHasChar fn ch = liftM toBool $
+  {#call unsafe font_has_char#} fn (fromIntegral (ord ch))
+#endif
+
+#if PANGO_VERSION_CHECK(1,46,0)
+-- | Get the face of the font.
+--
+-- * Only nullable if the font as outlived its fontmap.
+--
+-- Since: 1.46
+pangoFontGetFace :: Font -> IO (Maybe FontFace)
+pangoFontGetFace fn = do
+  ffsPtr <- {#call unsafe font_get_face#} fn
+  if ffsPtr == nullPtr
+    then return Nothing
+    else liftM Just . makeNewGObject mkFontFace . return $ castPtr ffsPtr
+#endif
+
+#if PANGO_VERSION_CHECK(1,10,0)
+-- | Get the FontMap of the font.
+--
+-- * Only nullable if the fontmap was finalized.
+--
+-- Since: 1.10
+pangoFontGetFontMap :: Font -> IO (Maybe FontMap)
+pangoFontGetFontMap fn = do
+  fmPtr <- {#call unsafe font_get_font_map#} fn
+  if fmPtr == nullPtr
+    then return Nothing
+    else liftM Just . makeNewGObject mkFontMap . return $ castPtr fmPtr
+#endif
+
+#if PANGO_VERSION_CHECK(1,50,0)
+-- | Get languages of the font.
+--
+-- Since: 1.50
+pangoFontGetLanguages :: Font -> IO [Language]
+pangoFontGetLanguages fn = do
+  langPtrPtr <- {# call unsafe font_get_languages#} fn
+  langPtrs <- peekArray0 nullPtr (castPtr langPtrPtr)
+  return $ map Language langPtrs
+#endif

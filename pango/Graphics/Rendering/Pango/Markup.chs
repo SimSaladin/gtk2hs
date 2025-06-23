@@ -59,6 +59,8 @@ module Graphics.Rendering.Pango.Markup (
   parseMarkup
   ) where
 
+import qualified Graphics.Rendering.Pango.Structs as Pango
+import qualified Graphics.Rendering.Pango.BasicTypes as Pango
 import qualified Graphics.Rendering.Pango.Enums as Pango
 import Graphics.Rendering.Pango.Attributes ( parseMarkup )
 
@@ -145,6 +147,32 @@ data SpanAttribute
   -- | Intensity of gravity.
   | FontGravityHint Pango.PangoGravityHint
 #endif
+#if PANGO_VERSION_CHECK(1,38,0)
+  -- | FIXME no idea how this gets parsed
+  | FontFeatures String
+  -- | Either an int <= 0xffff, or 0 <= int <= 100 followed by a "%" (decimal base-10)
+  | ForegroundAlpha String
+  -- | Either an int <= 0xffff, or 0 <= int <= 100 followed by a "%" (decimal base-10)
+  | BackgroundAlpha String
+#endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  | AllowBreaks Bool
+  | ShowFlags String -- FIXME PangoShowFlags should be?
+  | InsertHyphens Bool
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  | Overline Pango.PangoOverline
+  | OverlineColor String
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+  | LineHeight Double -- relative
+  | LineHeightAbsolute Double
+  | TextTransform String -- FIXME should this be enum?
+  | SegWord
+  | SegSentence
+  | BaselineShift Pango.PangoBaselineShift -- superscript/subscript/INT/FLOATpt
+  | FontScale Double
+#endif
 
 instance Show SpanAttribute where
   showsPrec _ (FontDescr str)    = showString " font_desc=".shows str
@@ -158,12 +186,42 @@ instance Show SpanAttribute where
   showsPrec _ (FontBackground c) = showString " background=".shows c
   showsPrec _ (FontUnderline u)  = showString " underline=".shows u
   showsPrec _ (FontRise r)       = showString " rise=".shows
-                                   (show (round (r*10000)))
+                                   (show (round (r*10000) :: Int))
   showsPrec _ (FontLang l)       = showString " lang=".shows l
 #if PANGO_VERSION_CHECK(1,16,0)
   showsPrec _ (FontGravity g) = showString " gravity=".shows g
-  showsPrec _ (FontGravityHint h) = showString " gravity_hint".shows h
+  showsPrec _ (FontGravityHint h) = showString " gravity_hint=".shows h
 #endif
+#if PANGO_VERSION_CHECK(1,38,0)
+  showsPrec _ (FontFeatures v)    = showString " font_features=".shows v
+  showsPrec _ (ForegroundAlpha v) = showString " fgalpha=".shows v
+  showsPrec _ (BackgroundAlpha v) = showString " bgalpha=".shows v
+#endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  showsPrec _ (AllowBreaks v)     = showString " allow_breaks=".shows (showsBool v)
+  showsPrec _ (InsertHyphens v)   = showString " insert_hyphens=".shows (showsBool v)
+  showsPrec _ (ShowFlags v)       = showString " show=".shows v
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  showsPrec _ (Overline v)        = showString " overline=".shows (show v)
+  showsPrec _ (OverlineColor v)   = showString " overline_color=".shows v
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+  showsPrec _ (LineHeight v)         = showString " line_height=".shows v
+  showsPrec _ (LineHeightAbsolute v) = showString " line_height=".shows (show (Pango.puToInt v)) -- float >1024
+  showsPrec _ (TextTransform v)      = showString " text_transform=".shows v
+  showsPrec _ SegWord                = showString " word"
+  showsPrec _ SegSentence            = showString " sentence"
+  showsPrec _ (BaselineShift v)      = showString " baseline_shift=".shows (showsBaselineShift v)
+  showsPrec _ (FontScale v)          = showString " font_scale=".shows v
+#endif
+
+showsBool :: Bool -> String
+showsBool b = if b then "y" else "n"
+
+showsBaselineShift :: Pango.PangoBaselineShift -> String
+showsBaselineShift (Pango.PangoBaselineShift d) = show (Pango.puToInt d)
+showsBaselineShift other                        = show other
 
 -- | Create the most generic span attribute.
 --

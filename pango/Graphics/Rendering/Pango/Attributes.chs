@@ -32,7 +32,8 @@ module Graphics.Rendering.Pango.Attributes (
   withAttrList,
   parseMarkup,
   fromAttrList,
-  readAttrList
+  readAttrList,
+  AttrIterator,
   ) where
 
 import System.Glib.FFI
@@ -145,6 +146,55 @@ crAttr c AttrGravityHint { paStart=s, paEnd=e, paGravityHint = g } =
   setAttrPos c s e $
   {#call unsafe attr_gravity_hint_new#} (fromIntegral (fromEnum g))
 #endif
+#if PANGO_VERSION_CHECK(1,38,0)
+crAttr c AttrFontFeatures { paStart=s, paEnd=e, paFontFeatures = fe } =
+  setAttrPos c s e $
+  withUTFString fe {#call unsafe attr_font_features_new#}
+crAttr c AttrForegroundAlpha { paStart=s, paEnd=e, paAlpha = ColorAlpha v } =
+  setAttrPos c s e $
+  {#call unsafe attr_foreground_alpha_new#} (fromIntegral v)
+crAttr c AttrBackgroundAlpha { paStart=s, paEnd=e, paAlpha = ColorAlpha v } =
+  setAttrPos c s e $
+  {#call unsafe attr_background_alpha_new#} (fromIntegral v)
+#endif
+#if PANGO_VERSION_CHECK(1,44,0)
+crAttr c AttrAllowBreaks { paStart=s, paEnd=e, paAllowBreaks = v } =
+  setAttrPos c s e $
+  {#call unsafe attr_allow_breaks_new#} (fromIntegral (fromEnum v))
+crAttr c AttrShow { paStart=s, paEnd=e, paShowFlags = v } =
+  setAttrPos c s e $
+  {#call unsafe attr_show_new#} (fromIntegral (fromEnum v))
+crAttr c AttrInsertHyphens { paStart=s, paEnd=e, paInsertHyphens = v } =
+  setAttrPos c s e $
+  {#call unsafe attr_insert_hyphens_new#} (fromIntegral (fromEnum v))
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+crAttr c AttrOverline { paStart=s, paEnd=e, paOverline = v } =
+  setAttrPos c s e $
+  {#call unsafe attr_overline_new#} (fromIntegral (fromEnum v))
+crAttr c AttrOverlineColor { paStart=s, paEnd=e, paOverlineColor = Color r g b } =
+  setAttrPos c s e $
+  {#call unsafe attr_overline_color_new#} (fromIntegral r) (fromIntegral g) (fromIntegral b)
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+crAttr c AttrTextTransform { paStart=s, paEnd=e, paTextTransform = tt } =
+  setAttrPos c s e $
+  {#call unsafe attr_text_transform_new#} (fromIntegral (fromEnum tt))
+crAttr c AttrBaselineShift { paStart=s, paEnd=e, paBaselineShift = bshift } =
+  setAttrPos c s e $
+  {#call unsafe attr_baseline_shift_new#} (fromIntegral (fromEnum bshift))
+crAttr c AttrWord { paStart=s, paEnd=e } = setAttrPos c s e $ {#call unsafe attr_word_new#}
+crAttr c AttrSentence { paStart=s, paEnd=e } = setAttrPos c s e $ {#call unsafe attr_sentence_new#}
+crAttr c AttrFontScale { paStart=s, paEnd=e, paFontScale = fnScale } =
+  setAttrPos c s e $
+  {#call unsafe attr_font_scale_new#} (fromIntegral (fromEnum fnScale))
+crAttr c AttrLineHeight { paStart=s, paEnd=e, paLineHeight = lineHeight } =
+  setAttrPos c s e $
+  {#call unsafe attr_line_height_new#} (realToFrac lineHeight)
+crAttr c AttrLineHeightAbsolute { paStart=s, paEnd=e, paLineHeightAbsolute = pu } =
+  setAttrPos c s e $
+  {#call unsafe attr_line_height_new_absolute#} (puToInt pu)
+#endif
 
 -- | Parse the marked-up text (see 'Graphics.Rendering.Pango.Markup.Markup'
 -- format) to create a plain-text string and an attribute list.
@@ -187,7 +237,7 @@ parseMarkup markup accelMarker = propagateGError $ \errPtr ->
       attrs <- fromAttrList (genUTFOfs str) attrList
       return (attrs, chr (fromIntegral accel), str)
 
-{#pointer *PangoAttrIterator #}
+{#pointer *PangoAttrIterator as AttrIterator #}
 
 -- | Convert an attribute list into a list of attributes.
 fromAttrList :: UTFCorrection -> PangoAttrList -> IO [[PangoAttribute]]

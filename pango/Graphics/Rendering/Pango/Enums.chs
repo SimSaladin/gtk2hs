@@ -54,7 +54,6 @@ module Graphics.Rendering.Pango.Enums (
   languageFromString,
   ) where
 
-{#import Graphics.Rendering.Pango.Types#}
 {#import Graphics.Rendering.Pango.BasicTypes#}
 import Graphics.Rendering.Pango.Structs
 
@@ -75,7 +74,7 @@ data Size
   | SizeLarger
 
 instance Show Size where
-  showsPrec _ (SizePoint v)             = shows $ show (round (v*1000))
+  showsPrec _ (SizePoint v)             = shows $ show (round (v*1000) :: Int)
   showsPrec _ (SizeUnreadable)          = shows "xx-small"
   showsPrec _ (SizeTiny)                = shows "x-small"
   showsPrec _ (SizeSmall)               = shows "small"
@@ -116,6 +115,10 @@ data FontMetrics = FontMetrics {
   --   below the bottom of the actual drawn ink. It is necessary to
   --   lay out the text to figure where the ink will be.)
   descent :: Double,
+#if PANGO_VERSION_CHECK(1,44,0)
+  -- | The height of text.
+  height :: Double,
+#endif
   -- | The approximate character width. This is merely a
   --   representative value useful, for example, for determining the
   --   initial size for a window. Actual characters in text will be
@@ -144,4 +147,3 @@ data FontMetrics = FontMetrics {
   strikethroughPosition :: Double
 #endif
   } deriving Show
-

@@ -75,6 +75,7 @@ Library
                          Graphics.Rendering.Pango.Types
                          Graphics.Rendering.Pango.BasicTypes
                          Graphics.Rendering.Pango.Structs
+                         Graphics.Rendering.Pango.HB
                          Graphics.Rendering.Pango.Attributes
         other-modules:   Graphics.Rendering.Pango.GlyphStorage
                          Graphics.Rendering.Pango.Description

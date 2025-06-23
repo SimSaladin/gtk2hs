@@ -40,6 +40,7 @@ module Graphics.Rendering.Pango.Cairo (
   cairoContextGetResolution,
   cairoContextSetFontOptions,
   cairoContextGetFontOptions,
+  cairoContextResetFontOptions,
   -- * Functions for the 'Render' monad.
   setSourceColor,
   updateContext,
@@ -53,12 +54,11 @@ module Graphics.Rendering.Pango.Cairo (
   layoutPath
   ) where
 
+import Prelude hiding (pi)
 import Control.Exception    (bracket)
 
 import System.Glib.FFI
 import System.Glib.UTFString
-import System.Glib.GObject              (wrapNewGObject, makeNewGObject,
-  objectRef, objectUnref)
 {#import Graphics.Rendering.Pango.Types#}
 {#import Graphics.Rendering.Pango.BasicTypes#}
 import Graphics.Rendering.Pango.Structs ( pangoItemGetFont, Color(..) )

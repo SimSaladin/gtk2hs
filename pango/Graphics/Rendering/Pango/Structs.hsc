@@ -33,6 +33,7 @@
 module Graphics.Rendering.Pango.Structs (
   PangoUnit,
   Color(..),
+  ColorAlpha(..),
   Rectangle(..),
   PangoRectangle(..),
   peekIntPangoRectangle,
@@ -51,17 +52,19 @@ module Graphics.Rendering.Pango.Structs (
   pangoItemRawGetLength,
   pangoItemRawAnalysis,
   pangoItemRawGetLevel,
-  readAttr
+  readAttr,
+#if PANGO_VERSION_CHECK(1,50,0)
+  PangoBaselineShift(..),
+#endif
+  HBOTTag(..)
   ) where
 
 import Control.Monad            (liftM)
-import Data.IORef
 import Control.Exception
 
 import System.Glib.FFI
 import System.Glib.UTFString ( peekUTFString, UTFCorrection,
                                ofsToUTF, ofsFromUTF, DefaultGlibString )
-import System.Glib.GObject              (makeNewGObject)
 import Graphics.Rendering.Pango.Types
 import Graphics.Rendering.Pango.BasicTypes
 
@@ -88,6 +91,8 @@ peekPangoColor ptr = do
     green  <- #{peek PangoColor, green} ptr
     blue   <- #{peek PangoColor, blue} ptr
     return $ Color red green blue
+
+data ColorAlpha = ColorAlpha (#gtk2hs_type guint16) deriving (Eq,Show)
 
 -- | Rectangle
 --
@@ -194,6 +199,7 @@ instance Enum PangoDirection where
   toEnum #{const PANGO_DIRECTION_WEAK_RTL } = PangoDirectionWeakRtl
   toEnum #{const PANGO_DIRECTION_NEUTRAL } = PangoDirectionNeutral
 #endif
+  toEnum _ = error "toEnum(PangoDirection): invalid value"
 
 -- This is a copy of the local function direction_simple in pango-layout.c
 pangodirToLevel :: PangoDirection -> Int
@@ -203,6 +209,31 @@ pangodirToLevel PangoDirectionRtl = -1
 pangodirToLevel PangoDirectionWeakLtr = 1
 pangodirToLevel PangoDirectionWeakRtl = -1
 pangodirToLevel PangoDirectionNeutral = 0
+#endif
+
+#if PANGO_VERSION_CHECK(1,50,0)
+data PangoBaselineShift
+  = PangoBaselineShiftNone
+  | PangoBaselineShiftSuperscript
+  | PangoBaselineShiftSubscript
+  | PangoBaselineShift Double
+  deriving Eq
+
+instance Enum PangoBaselineShift where
+  fromEnum PangoBaselineShiftNone = #{const PANGO_BASELINE_SHIFT_NONE}
+  fromEnum PangoBaselineShiftSuperscript = #{const PANGO_BASELINE_SHIFT_SUPERSCRIPT}
+  fromEnum PangoBaselineShiftSubscript = #{const PANGO_BASELINE_SHIFT_SUBSCRIPT}
+  fromEnum (PangoBaselineShift n) = fromIntegral (puToInt n)
+  toEnum #{const PANGO_BASELINE_SHIFT_NONE} = PangoBaselineShiftNone
+  toEnum #{const PANGO_BASELINE_SHIFT_SUPERSCRIPT} = PangoBaselineShiftSuperscript
+  toEnum #{const PANGO_BASELINE_SHIFT_SUBSCRIPT} = PangoBaselineShiftSubscript
+  toEnum i = PangoBaselineShift (intToPu $ fromIntegral i)
+
+instance Show PangoBaselineShift where
+  show PangoBaselineShiftNone = "none"
+  show PangoBaselineShiftSuperscript = "superscript"
+  show PangoBaselineShiftSubscript = "subscript"
+  show (PangoBaselineShift n) = show n -- >1024 || <1024
 #endif
 
 -- | Extract the font used for this 'PangoItem'.
@@ -350,12 +381,73 @@ data PangoAttribute
   | AttrGravity { paStart :: Int, paEnd :: Int,
                         paGravity :: PangoGravity }
 
-        -- | Set the way horizontal scripts behave in a vertical context.
+  -- | Set the way horizontal scripts behave in a vertical context.
   --
   -- * Available in Pango 1.16.0 and higher.
   --
-        | AttrGravityHint  { paStart :: Int, paEnd :: Int,
+  | AttrGravityHint  { paStart :: Int, paEnd :: Int,
                         paGravityHint :: PangoGravityHint }
+#endif
+#if PANGO_VERSION_CHECK(1,38,0)
+  | AttrFontFeatures { paStart :: Int, paEnd :: Int,
+                        paFontFeatures :: DefaultGlibString }
+
+  -- | Foreground alpha.
+  | AttrForegroundAlpha { paStart :: Int, paEnd :: Int,
+                        paAlpha :: ColorAlpha }
+
+  -- | Background alpha.
+  | AttrBackgroundAlpha { paStart :: Int, paEnd :: Int,
+                        paAlpha :: ColorAlpha }
+#endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  -- | Whether breaks are allowed.
+  | AttrAllowBreaks { paStart :: Int, paEnd :: Int,
+                        paAllowBreaks :: Bool }
+
+  -- | How to render invisible characters.
+  | AttrShow { paStart :: Int, paEnd :: Int,
+                        paShowFlags :: PangoShowFlags }
+
+  -- | Whether to insert hyphens at intra-word line breaks.
+  | AttrInsertHyphens { paStart :: Int, paEnd :: Int,
+                        paInsertHyphens :: Bool }
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  -- | Whether the text has an overline.
+  | AttrOverline { paStart :: Int, paEnd :: Int,
+                        paOverline :: PangoOverline }
+
+  -- | Overline color.
+  | AttrOverlineColor { paStart :: Int, paEnd :: Int,
+                        paOverlineColor :: Color }
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+  -- | Override line height to a relative scale.
+  | AttrLineHeight { paStart :: Int, paEnd :: Int,
+                        paLineHeight :: Double }
+
+  -- | Override line height to absolute height.
+  | AttrLineHeightAbsolute { paStart :: Int, paEnd :: Int,
+                        paLineHeightAbsolute :: Double }
+
+  -- | Transform text capitalization.
+  | AttrTextTransform { paStart :: Int, paEnd :: Int,
+                        paTextTransform :: PangoTextTransform }
+
+  -- | Override segmentation to classify the range of the attribute as a single word.
+  | AttrWord { paStart :: Int, paEnd :: Int }
+
+  -- | Override segmentation to classify the range of the attribute as a single sentence.
+  | AttrSentence { paStart :: Int, paEnd :: Int }
+
+  -- | Baseline shift superscript, subscript or exact (pango units)
+  | AttrBaselineShift { paStart :: Int, paEnd :: Int,
+                        paBaselineShift :: PangoBaselineShift }
+
+  -- | Font size change relative of the previous run.
+  | AttrFontScale { paStart :: Int, paEnd :: Int,
+                        paFontScale :: PangoFontScale }
 #endif
   deriving Show
 
@@ -456,4 +548,64 @@ readAttr correct attrPtr = do
       v <- #{peek PangoAttrInt, value} attrPtr
       return $ AttrGravityHint b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
 #endif
+#if PANGO_VERSION_CHECK(1,38,0)
+    #{const PANGO_ATTR_FONT_FEATURES} -> do
+      strPtr <- #{peek PangoAttrFontFeatures, features} attrPtr
+      str <- peekUTFString strPtr
+      return $ AttrFontFeatures b e str
+    #{const PANGO_ATTR_FOREGROUND_ALPHA} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrForegroundAlpha b e (ColorAlpha (v::#{gtk2hs_type guint16}))
+    #{const PANGO_ATTR_BACKGROUND_ALPHA} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrBackgroundAlpha b e (ColorAlpha (v::#{gtk2hs_type guint16}))
+#endif
+#if PANGO_VERSION_CHECK(1,44,0)
+    #{const PANGO_ATTR_ALLOW_BREAKS} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrAllowBreaks b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+    #{const PANGO_ATTR_SHOW} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrShow b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+    #{const PANGO_ATTR_INSERT_HYPHENS} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrInsertHyphens b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+    #{const PANGO_ATTR_OVERLINE} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrOverline b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+    #{const PANGO_ATTR_OVERLINE_COLOR} -> do
+      col <- peekPangoColor (#{ptr PangoAttrColor, color} attrPtr)
+      return $ AttrOverlineColor b e col
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+    #{const PANGO_ATTR_LINE_HEIGHT} -> do
+      v <- #{peek PangoAttrFloat, value} attrPtr
+      return $ AttrLineHeight b e (realToFrac (v::#{gtk2hs_type double}))
+    #{const PANGO_ATTR_ABSOLUTE_LINE_HEIGHT} -> do
+      v <- #{peek PangoAttrFloat, value} attrPtr
+      return $ AttrLineHeightAbsolute b e (realToFrac (v::#{gtk2hs_type double}))
+    #{const PANGO_ATTR_TEXT_TRANSFORM} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrTextTransform b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+    #{const PANGO_ATTR_WORD} -> return $ AttrWord b e
+    #{const PANGO_ATTR_SENTENCE} -> return $ AttrSentence b e
+    #{const PANGO_ATTR_BASELINE_SHIFT} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrBaselineShift b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+    #{const PANGO_ATTR_FONT_SCALE} -> do
+      v <- #{peek PangoAttrInt, value} attrPtr
+      return $ AttrFontScale b e (toEnum (fromIntegral (v::#{gtk2hs_type int})))
+#endif
     _ -> error "extracting pango attributes: unknown attribute type"
+
+data HBOTTag = HBOTTagGSUB
+             | HBOTTagGPOS deriving (Eq, Ord)
+
+instance Enum HBOTTag where
+  fromEnum HBOTTagGSUB = #{const HB_OT_TAG_GSUB}
+  fromEnum HBOTTagGPOS = #{const HB_OT_TAG_GPOS}
+  toEnum #{const HB_OT_TAG_GSUB} = HBOTTagGSUB
+  toEnum #{const HB_OT_TAG_GPOS} = HBOTTagGPOS
+  toEnum _ = error "toEnum(HBOTTag): invalid value"

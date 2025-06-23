@@ -48,20 +48,32 @@ module Graphics.Rendering.Pango.Description (
   fontDescriptionGetStretch,
   fontDescriptionSetSize,
   fontDescriptionGetSize,
+#if PANGO_VERSION_CHECK(1,42,0)
+  Variation(..),
+  fontDescriptionGetVariations,
+  fontDescriptionSetVariations,
+#endif
+#if PANGO_VERSION_CHECK(1,56,0)
+  fontDescriptionGetFeatures,
+  fontDescriptionSetFeatures,
+#endif
   FontMask(..),
   fontDescriptionUnsetFields,
   fontDescriptionMerge,
+  fontDescriptionIsMatch,
   fontDescriptionBetterMatch,
   fontDescriptionFromString,
   fontDescriptionToString
   ) where
 
 import Control.Monad    (liftM)
+import qualified Data.List as L
+import Data.String (IsString(..))
+import Data.Char (toLower)
 
 import System.Glib.FFI
 import System.Glib.Flags                (Flags, fromFlags)
 import System.Glib.UTFString
-{#import Graphics.Rendering.Pango.Types#}
 {#import Graphics.Rendering.Pango.Enums#}
 import Graphics.Rendering.Pango.Structs ( puToInt, intToPu )
 import Graphics.Rendering.Pango.BasicTypes
@@ -185,6 +197,63 @@ fontDescriptionGetSize fd = do
      then liftM (\x -> Just (intToPu x)) $
               {#call unsafe get_size#} fd
      else return Nothing
+
+#if PANGO_VERSION_CHECK(1,42,0)
+data Variation = Variation { vaAxis :: String, vaValue :: Double } deriving (Eq, Ord)
+
+instance Show Variation where
+  show (Variation axis v) = axis ++ "=" ++ show v
+
+instance IsString Variation where
+  fromString s = let (axis, s') = span (/= '=') s
+    in case s' of
+       _:s'' -> Variation (map toLower axis) (read s'')
+       [] -> error $ "Invalid variation string: " ++ s
+
+-- | Get variations.
+--
+-- Since 1.42
+fontDescriptionGetVariations :: FontDescription -> [Variation]
+fontDescriptionGetVariations fd = unsafePerformIO $ do
+  strPtr <- {#call unsafe get_variations#} fd
+  if strPtr == nullPtr
+     then return []
+     else liftM parse $ peekUTFString strPtr
+  where
+    parse [] = []
+    parse s = let (item, s') = span (/= ',') s
+      in fromString item : (case s' of { [] -> []; _:s'' -> parse s'' })
+
+-- | Set variations.
+
+-- Since 1.42
+fontDescriptionSetVariations :: FontDescription -> [Variation] -> IO ()
+fontDescriptionSetVariations fd vs =
+  withUTFString (L.concat . L.intersperse "," $ map show vs) $ \strPtr ->
+    {#call unsafe set_variations#} fd strPtr
+#endif
+
+#if PANGO_VERSION_CHECK(1,56,0)
+-- | Get features in a font description.
+--
+-- Since 1.56
+fontDescriptionGetFeatures :: FontDescription -> IO Maybe String
+fontDescriptionGetFeatures fd = do
+  -- features is comma-separated list of feature assignments:
+  --   FEATURE=n
+  -- where FEATURE must be a 4 character tag, and n an integer >= 0.
+  strPtr <- {#call unsafe get_features#} fd
+  if strPtr == nullPtr
+     then return Nothing
+     else liftM Just $ peekUTFString strPtr
+
+-- | Set features in a font description.
+
+-- Since 1.56
+fontDescriptionSetFeatures :: FontDescription -> String -> IO ()
+fontDescriptionSetFeatures fd fs = withUTFString fs $ \strPtr ->
+  {#call unsafe set_features#} fd strPtr
+#endif
 
 -- | Reset fields in a font description.
 --

@@ -8,6 +8,7 @@
 
 #include<pango/pango.h>
 #include<pango/pangocairo.h>
+#include <hb-ot.h>
 
 #ifndef PANGO_VERSION_MINOR
 #include "hspangoversion.h"

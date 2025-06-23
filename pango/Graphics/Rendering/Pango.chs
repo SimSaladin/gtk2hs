@@ -63,6 +63,7 @@ module Graphics.Rendering.Pango (
   module Graphics.Rendering.Pango.Font,
   module Graphics.Rendering.Pango.Enums,
   module Graphics.Rendering.Pango.Cairo,
+  module Graphics.Rendering.Pango.HB,
   ) where
 
 import Graphics.Rendering.Pango.Font
@@ -81,3 +82,4 @@ import Graphics.Rendering.Pango.Layout hiding (
 import Graphics.Rendering.Pango.Rendering
 import Graphics.Rendering.Pango.Markup
 import Graphics.Rendering.Pango.Cairo
+import Graphics.Rendering.Pango.HB

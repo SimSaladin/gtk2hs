@@ -44,6 +44,16 @@ module Graphics.Rendering.Pango.BasicTypes (
   PangoGravity(..),
   PangoGravityHint(..),
 #endif
+#if PANGO_VERSION_CHECK(1,44,0)
+  PangoShowFlags(..),
+#endif
+#if PANGO_VERSION_CHECK(1,46,0)
+  PangoOverline(..),
+#endif
+#if PANGO_VERSION_CHECK(1,50,0)
+  PangoTextTransform(..),
+  PangoFontScale(..),
+#endif
   PangoString(PangoString),
   makeNewPangoString,
   withPangoString,
@@ -78,8 +88,7 @@ import Data.IORef ( IORef )
 import qualified Data.Text as T (unpack)
 import System.Glib.FFI
 import System.Glib.UTFString
-{#import Graphics.Rendering.Pango.Types#} (Font, PangoLayoutRaw)
--- {#import Graphics.Rendering.Pango.Enums#}
+{#import Graphics.Rendering.Pango.Types#} (PangoLayoutRaw)
 
 {# context lib="pango" prefix="pango" #}
 
@@ -141,6 +150,9 @@ instance Show Weight where
   showsPrec _ WeightMedium      = shows "medium"
   showsPrec _ WeightUltraheavy  = shows "ultraheavy"
 #endif
+#if PANGO_VERSION_CHECK(1,36,7)
+  showsPrec _ WeightSemilight   = shows "semilight"
+#endif
 
 -- | The variant of a font.
 --
@@ -152,6 +164,13 @@ instance Show Weight where
 instance Show Variant where
   showsPrec _ VariantNormal       = shows "normal"
   showsPrec _ VariantSmallCaps    = shows "smallcaps"
+#if PANGO_VERSION_CHECK(1,50,0)
+  showsPrec _ VariantAllSmallCaps  = shows "allsmallcaps"
+  showsPrec _ VariantPetiteCaps    = shows "petitecaps"
+  showsPrec _ VariantAllPetiteCaps = shows "allpetitecaps"
+  showsPrec _ VariantUnicase       = shows "unicase"
+  showsPrec _ VariantTitleCaps     = shows "titlecaps"
+#endif
 
 -- | Define how wide characters are.
 --
@@ -180,6 +199,11 @@ instance Show Underline where
   showsPrec _ UnderlineDouble   = shows "double"
   showsPrec _ UnderlineLow      = shows "low"
   showsPrec _ UnderlineError    = shows "error"
+#if PANGO_VERSION_CHECK(1,46,0)
+  showsPrec _ UnderlineSingleLine = shows "singleline"
+  showsPrec _ UnderlineDoubleLine = shows "doubleline"
+  showsPrec _ UnderlineErrorLine  = shows "errorline"
+#endif
 
 #if PANGO_VERSION_CHECK(1,16,0)
 -- |  The 'PangoGravity' type represents the orientation of glyphs in a
@@ -232,6 +256,32 @@ instance Show PangoGravityHint where
 
 #endif
 
+#if PANGO_VERSION_CHECK(1,44,0)
+{# enum PangoShowFlags {underscoreToCase} deriving (Eq,Ord,Show) #}
+#endif
+
+#if PANGO_VERSION_CHECK(1,46,0)
+{# enum PangoOverline {underscoreToCase} deriving (Eq,Ord,Show) #}
+#endif
+
+#if PANGO_VERSION_CHECK(1,50,0)
+{#enum PangoTextTransform {underscoreToCase} with prefix="" deriving (Eq)#}
+
+instance Show PangoTextTransform where
+  show PangoTextTransformNone = "none"
+  show PangoTextTransformLowercase = "lowercase"
+  show PangoTextTransformUppercase = "uppercase"
+  show PangoTextTransformCapitalize = "capitalize"
+
+{#enum PangoFontScale {underscoreToCase} with prefix="" deriving (Eq)#}
+
+instance Show PangoFontScale where
+  show PangoFontScaleNone = "none"
+  show PangoFontScaleSuperscript = "superscript"
+  show PangoFontScaleSubscript = "subscript"
+  show PangoFontScaleSmallCaps = "small-caps"
+#endif
+
 -- A string that is stored with each GlyphString, PangoItem
 data PangoString = PangoString UTFCorrection CInt (ForeignPtr CChar)
 
@@ -271,7 +321,7 @@ foreign import ccall unsafe "&pango_item_free"
   pango_item_free :: FinalizerPtr PangoItemRaw
 
 #if PANGO_VERSION_CHECK(1,2,0)
-{#pointer *PangoGlyphItem as GlyphItemRaw #}
+--{#pointer *PangoGlyphItem as GlyphItemRaw #}
 #endif
 
 -- With each GlyphString we pair a UTFCorrection
@@ -355,4 +405,6 @@ instance Show FontDescription where
     {#call unsafe g_free#} (castPtr strPtr)
     return $ T.unpack str
 
-
+instance Eq FontDescription where
+  fd1 == fd2 = unsafePerformIO $ liftM toBool $
+    {#call unsafe font_description_equal#} fd1 fd2

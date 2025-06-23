@@ -40,6 +40,7 @@ module Graphics.Rendering.Pango.GlyphStorage (
 #endif
   ) where
 
+import Prelude hiding (log, pi)
 import Control.Monad    (liftM)
 import System.Glib.FFI
 {#import Graphics.Rendering.Pango.Types#} (Font(..))
@@ -143,7 +144,7 @@ glyphItemGetLogicalWidths (GlyphItem (PangoItem ps pir) gs) mDir = do
   dir <- case mDir of
     Just dir -> return dir
     Nothing -> withPangoItemRaw pir pangoItemRawGetLevel
-  withPangoString ps $ \uc l strPtr -> do
+  withPangoString ps $ \_uc l strPtr -> do
     logLen <- {#call unsafe g_utf8_strlen#} strPtr (fromIntegral l)
     allocaArray (fromIntegral logLen) $ \arrPtr -> do
       {# call unsafe pango_glyph_string_get_logical_widths #}
@@ -168,7 +169,7 @@ glyphItemSplit (GlyphItem (PangoItem ps pir) gs) pos = do
   allocaBytes {#sizeof PangoGlyphItem#} $ \giPtr1 -> do
     {#set PangoGlyphItem.item#} giPtr1 pirPtr1
     {#set PangoGlyphItem.glyphs#} giPtr1 gsrPtr1
-    giPtr2 <- withPangoString ps $ \uc l strPtr ->
+    giPtr2 <- withPangoString ps $ \uc _l strPtr ->
       {#call unsafe pango_glyph_item_split#} giPtr1 strPtr
         (fromIntegral (ofsToUTF pos uc))
     if giPtr2==nullPtr then
