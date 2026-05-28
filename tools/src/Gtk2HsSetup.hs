@@ -141,20 +141,36 @@ gtk2hsUserHooks = simpleUserHooks {
     confHook = \pd cf ->
       (fmap adjustLocalBuildInfo (confHook simpleUserHooks pd cf)),
     postConf = \args cf pd lbi -> do
+#if MIN_VERSION_Cabal(3,17,0)
+      genSynthezisedFiles (mkVerbosity defaultVerbosityHandles $ fromFlag (configVerbosity cf)) pd lbi
+#else
       genSynthezisedFiles (fromFlag (configVerbosity cf)) pd lbi
+#endif
       postConf simpleUserHooks args cf pd lbi,
     buildHook = \pd lbi uh bf -> fixDeps pd >>= \pd ->
                                  buildHook simpleUserHooks pd lbi uh bf,
     copyHook = \pd lbi uh flags -> copyHook simpleUserHooks pd lbi uh flags >>
+#if MIN_VERSION_Cabal(3,17,0)
+      installCHI pd lbi (mkVerbosity defaultVerbosityHandles $ fromFlag (copyVerbosity flags)) (fromFlag (copyDest flags)),
+#else
       installCHI pd lbi (fromFlag (copyVerbosity flags)) (fromFlag (copyDest flags)),
+#endif
     instHook = \pd lbi uh flags ->
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
       installHook pd lbi uh flags >>
+#if MIN_VERSION_Cabal(3,17,0)
+      installCHI pd lbi (mkVerbosity defaultVerbosityHandles $ fromFlag (installVerbosity flags)) NoCopyDest,
+#else
       installCHI pd lbi (fromFlag (installVerbosity flags)) NoCopyDest,
+#endif
     regHook = registerHook
 #else
       instHook simpleUserHooks pd lbi uh flags >>
+#if MIN_VERSION_Cabal(3,17,0)
+      installCHI pd lbi (mkVerbosity defaultVerbosityHandles $ fromFlag (installVerbosity flags)) NoCopyDest
+#else
       installCHI pd lbi (fromFlag (installVerbosity flags)) NoCopyDest
+#endif
 #endif
   }
 
@@ -233,7 +249,9 @@ registerHook pkg_descr localbuildinfo _ flags =
     then register pkg_descr localbuildinfo flags
     else setupMessage verbosity
            "Package contains no library to register:" (packageId pkg_descr)
-#if MIN_VERSION_Cabal(3,14,0)
+#if MIN_VERSION_Cabal(3,17,0)
+  where verbosity = mkVerbosity defaultVerbosityHandles $ fromFlag (setupVerbosity . registerCommonFlags $ flags)
+#elif MIN_VERSION_Cabal(3,14,0)
   where verbosity = fromFlag (setupVerbosity . registerCommonFlags $ flags)
 #else
   where verbosity = fromFlag (regVerbosity flags)
@@ -312,7 +330,10 @@ register pkg@PackageDescription { library       = Just lib  } lbi regFlags
     reloc     = relocatable lbi
     packageDbs = nub $ withPackageDB lbi
                     ++ maybeToList (flagToMaybe  (regPackageDB regFlags))
-#if MIN_VERSION_Cabal(3,14,0)
+#if MIN_VERSION_Cabal(3,17,0)
+    distPref  = fromFlag (setupDistPref . registerCommonFlags $ regFlags)
+    verbosity = mkVerbosity defaultVerbosityHandles $ fromFlag (setupVerbosity . registerCommonFlags $ regFlags)
+#elif MIN_VERSION_Cabal(3,14,0)
     distPref  = fromFlag (setupDistPref . registerCommonFlags $ regFlags)
     verbosity = fromFlag (setupVerbosity . registerCommonFlags $ regFlags)
 #else
@@ -325,7 +346,9 @@ register pkg@PackageDescription { library       = Just lib  } lbi regFlags
 
 register _ _ regFlags = notice verbosity "No package to register"
   where
-#if MIN_VERSION_Cabal(3,14,0)
+#if MIN_VERSION_Cabal(3,17,0)
+    verbosity = mkVerbosity defaultVerbosityHandles (fromFlag (setupVerbosity . registerCommonFlags $ regFlags))
+#elif MIN_VERSION_Cabal(3,14,0)
     verbosity = fromFlag (setupVerbosity . registerCommonFlags $ regFlags)
 #else
     verbosity = fromFlag (regVerbosity regFlags)
@@ -633,7 +656,11 @@ sortTopological ms = reverse $ fst $ foldl visit ([], S.empty) (map mdOriginal m
 checkGtk2hsBuildtools :: [Program] -> IO ()
 checkGtk2hsBuildtools programs = do
   programInfos <- mapM (\ prog -> do
+#if MIN_VERSION_Cabal(3,17,0)
+                         location <- onDefaultSearchPath programFindLocation prog $ mkVerbosity defaultVerbosityHandles normal
+#else
                          location <- onDefaultSearchPath programFindLocation prog normal
+#endif
                          return (programName prog, location)
                       ) programs
   let printError name = do
