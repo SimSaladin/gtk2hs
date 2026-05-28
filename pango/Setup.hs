@@ -28,7 +28,11 @@ main =
   defaultMainWithHooks gtk2hsUserHooks {
 
     postConf = \args cf pd lbi -> do
+#if MIN_VERSION_Cabal(3,17,0)
+      let verb = mkVerbosity defaultVerbosityHandles (fromFlag (configVerbosity cf))
+#else
       let verb = (fromFlag (configVerbosity cf))
+#endif
       cPkgs <- getPkgConfigPackages verb lbi pd
       let [pangoVersion] = [ v | PackageIdentifier (unPackageName -> "pango") v <- cPkgs ]
       writePangoVersionHeaderFile verb lbi pangoVersion
